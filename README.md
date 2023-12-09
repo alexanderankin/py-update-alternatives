@@ -22,9 +22,13 @@ Additionally, this supports a "run command" style file.
 ```shell
 test -d ./.venv && python -m venv .venv
 test -d ./.venv/bin && . .venv/bin/activate || . .venv/Scripts/activate
-pip install -e .[test]
+pip install -e .[dev]
 ```
 
 ```shell
 pytest
+#pytest --cov-report term --cov update_alternatives
+#pytest --cov-report term --cov update_alternatives --cov-fail-under=80
+#pytest --cov-report html --cov update_alternatives
+ruff check
 ```

@@ -263,21 +263,15 @@ def run():
         cmd_fields = fields(cmd_type)
         for f in cmd_fields:
             cmd_parser.add_argument(f.name, type=f.type)
-        b = True
 
     args = parser.parse_args()
-    argument_type = COMMANDS_TYPES[Command[args.command]]
+    selected_command = Command[args.command]
+    argument_type = COMMANDS_TYPES[selected_command]
     vars_args = vars(args)
 
     options = ignore_properties(Options, vars_args)
-    argument = None if argument_type is None \
-        else ignore_properties(argument_type, vars_args)
+    # method arguments
+    m_args = [] if argument_type is None \
+        else [ignore_properties(argument_type, vars_args)]
 
-    AlternativeUpdater(options)
-
-# if __name__ == '__main__':
-#     import sys
-#
-#     # sys.argv = ['update_alternatives', 'set', 'name', 'path']
-#     sys.argv = ['update_alternatives', 'get_selections']
-#     run()
+    getattr(AlternativeUpdater(options), selected_command.value)(*m_args)

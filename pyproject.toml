@@ -14,6 +14,11 @@ authors = [
 dependencies = []
 
 [project.optional-dependencies]
-test = [
+dev = [
     "pytest",
+    "pytest-cov",
+    "ruff",
 ]
+
+[tool.ruff.lint]
+ignore = ["F541"]
