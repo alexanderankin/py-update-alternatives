@@ -1,0 +1,10 @@
+altdir = 'alt-dir'
+admindir = 'admin-dir'
+instdir = 'inst-dir'
+root = 'root'
+log = 'log'
+force = false
+skip_auto = true
+quiet = true
+verbose = false
+debug = false

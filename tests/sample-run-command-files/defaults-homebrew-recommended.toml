@@ -1,0 +1,10 @@
+altdir = '/opt/homebrew/etc/alternatives'
+admindir = '/opt/homebrew/var/alternatives'
+#instdir = '/opt/homebrew'  # ?
+#root = '/opt/homebrew'  # ?
+log = '/opt/homebrew/var/alternatives.log'
+#force = true
+#skip_auto = true
+#quiet = true
+#verbose = false
+#debug = false

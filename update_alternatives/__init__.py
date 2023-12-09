@@ -1,8 +1,14 @@
 from argparse import ArgumentParser
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, fields, field, asdict
 from enum import Enum
 from pathlib import Path
 from typing import TypeVar, Type, Optional, Dict, Any, List
+
+try:
+    import tomllib
+except ImportError:
+    # https://stackoverflow.com/a/75677482
+    from pip._vendor import tomli as tomllib  # noqa
 
 IPT = TypeVar('IPT')
 
@@ -90,6 +96,16 @@ class Options:
     quiet: Optional[bool] = None
     verbose: Optional[bool] = None
     debug: Optional[bool] = None
+
+    @staticmethod
+    def from_toml(sample_text):
+        return ignore_properties(Options, tomllib.loads(sample_text))
+
+    def combine_with(self, argument: 'Options') -> 'Options':
+        me = {k: v for (k, v) in asdict(self).items() if v is not None}
+        you = {k: v for (k, v) in asdict(argument).items() if v is not None}
+        me.update(you)
+        return Options(**me)
 
 
 # noinspection PyMethodMayBeStatic
@@ -231,14 +247,37 @@ def run():
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--debug', action='store_true')
 
+    # command sub parser
     command = parser.add_subparsers(dest='command', required=True)
-    commands = {c.value: command.add_parser(c.value) for c in Command}
+    # command parsers
+    commands = {c: command.add_parser(c.value) for c in Command}
     # print(commands)
+
+    # add in arguments
+    for cmd_parser_e in commands.items():
+        cmd = cmd_parser_e[0]
+        cmd_parser = cmd_parser_e[1]
+        cmd_type = COMMANDS_TYPES[cmd]
+        if cmd_type is None: continue  # noqa
+        # noinspection PyDataclass
+        cmd_fields = fields(cmd_type)
+        for f in cmd_fields:
+            cmd_parser.add_argument(f.name, type=f.type)
+        b = True
+
     args = parser.parse_args()
-
+    argument_type = COMMANDS_TYPES[Command[args.command]]
     vars_args = vars(args)
-    print(ignore_properties(Options, vars_args))
 
+    options = ignore_properties(Options, vars_args)
+    argument = None if argument_type is None \
+        else ignore_properties(argument_type, vars_args)
 
-if __name__ == '__main__':
-    run()
+    AlternativeUpdater(options)
+
+# if __name__ == '__main__':
+#     import sys
+#
+#     # sys.argv = ['update_alternatives', 'set', 'name', 'path']
+#     sys.argv = ['update_alternatives', 'get_selections']
+#     run()

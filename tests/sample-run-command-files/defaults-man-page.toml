@@ -1,0 +1,10 @@
+altdir = '/usr/local/etc/alternatives'
+admindir = '/usr/local/var/lib/dpkg/alternatives'
+instdir = ''
+root = ''
+log = '/usr/local/var/log/alternatives.log'
+force = false
+skip_auto = false
+quiet = false
+verbose = false
+debug = false
