@@ -1,0 +1,19 @@
+# hopefully they are all the same but i am using auto discovery
+# https://setuptools.pypa.io/en/latest/userguide/package_discovery.html#auto-discovery
+#[build-system]
+#requires = ["setuptools"]
+#build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-update-alternatives"
+description = "update-alternatives cross platform python implementation"
+version = "0.1.0"
+authors = [
+    { name = "David", email = "daveankin@gmail.com" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
