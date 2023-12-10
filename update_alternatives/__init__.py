@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from dataclasses import dataclass, fields, field, asdict
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar, Type, Optional, Dict, Any, List
+from typing import TypeVar, Type, Optional, Dict, Any, List, Union
 
 try:
     import tomllib
@@ -109,10 +109,30 @@ class Options:
         return ignore_properties(Options, tomllib.loads(sample_text))
 
     def combine_with(self, argument: 'Options') -> 'Options':
+        """self is lower priority than argument"""
         me = {k: v for (k, v) in asdict(self).items() if v is not None}
         you = {k: v for (k, v) in asdict(argument).items() if v is not None}
         me.update(you)
         return Options(**me)
+
+
+# in order of lowest to highest priority
+OPTIONS_LOCATIONS = [
+    Path('etc', '.py-update-alternatives.toml'),
+    Path.home().joinpath('.py-update-alternatives.toml'),
+]
+
+
+def read_options(locations: Optional[List[Union[str, Path]]] = None,
+                 final_options: Optional[Options] = None):
+    o = Options()
+    locations = locations or OPTIONS_LOCATIONS
+    for location in locations:
+        if location.exists() and location.is_file():
+            o = o.combine_with(Options.from_toml(location.read_text('utf-8')))
+    if final_options:
+        o.combine_with(final_options)
+    return o
 
 
 # noinspection PyMethodMayBeStatic
@@ -282,8 +302,13 @@ def run(args: Optional[List[str]] = None):
     vars_args = vars(args)
 
     options = ignore_properties(Options, vars_args)
+    options = read_options(final_options=options)
     # method arguments
     m_args = [] if argument_type is None \
         else [ignore_properties(argument_type, vars_args)]
 
     getattr(AlternativeUpdater(options), selected_command.value)(*m_args)
+
+
+if __name__ == '__main__':
+    run()
