@@ -21,6 +21,13 @@ def ignore_properties(cls: Type[IPT], dict_: any) -> IPT:
     return cls(**filtered)
 
 
+COMMAND_REPLACEMENTS = {
+    'remove-all': 'remove_all',
+    'get-selections': 'get_selections',
+    'set-selections': 'set_selections',
+}
+
+
 class Command(Enum):
     # --install link name path priority [--slave link name path]...
     install = 'install'
@@ -233,7 +240,7 @@ class AlternativeUpdater:
             )
 
 
-def run():
+def run(args: Optional[List[str]] = None):
     parser = ArgumentParser()
 
     parser.add_argument('--altdir')  # directory
@@ -264,7 +271,12 @@ def run():
         for f in cmd_fields:
             cmd_parser.add_argument(f.name, type=f.type)
 
-    args = parser.parse_args()
+    if args is None:
+        import sys
+        args = sys.argv[1:]
+
+    args = [COMMAND_REPLACEMENTS.get(a, a) for a in args]
+    args = parser.parse_args(args)
     selected_command = Command[args.command]
     argument_type = COMMANDS_TYPES[selected_command]
     vars_args = vars(args)
