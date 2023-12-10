@@ -29,7 +29,7 @@ from pathlib import Path
 
 # in order of lowest to highest priority
 OPTIONS_LOCATIONS = [
-    Path('etc', '.py-update-alternatives.toml'),
+    Path('etc', 'py-update-alternatives.toml'),
     Path.home().joinpath('.py-update-alternatives.toml'),
 ]
 
