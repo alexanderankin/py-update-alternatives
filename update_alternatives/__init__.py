@@ -203,7 +203,25 @@ class AlternativeUpdater:
         admin_path.write_text(query.stringify())
 
     def set(self, name_and_path: NameAndPath):
-        print(f'set: name_and_path: {name_and_path}')
+        n = name_and_path.name
+        path = name_and_path.path
+
+        query = self._query(name=n)
+        alts = query.alternatives
+        match = next(iter([a for a in alts if a.location == path]), None)
+        if not match:
+            raise Exception(f'not a registered alternative for {n}: {path}')
+
+        self.link_alternative(match, n)
+
+    def link_alternative(
+            self,
+            alternative: 'AlternativeUpdater.Query.Alternative',
+            name: str
+    ):
+        alt_path = Path(self.options.altdir).joinpath(name)
+        os.remove(alt_path)
+        os.link(src=alt_path, dst=alternative.location)
 
     def remove(self, name_and_path: NameAndPath):
         print(f'remove: name_and_path: {name_and_path}')
@@ -222,7 +240,8 @@ class AlternativeUpdater:
         self.set(NameAndPath(name=name.name, path=highest.location))
 
     def display(self, name: Name):
-        print(f'display: name: {name}')
+        q = self._query(name.name)
+        print(q.to_display(self.options))
 
     def get_selections(self):
         print(f'get_selections')
@@ -241,10 +260,91 @@ class AlternativeUpdater:
         print(self._query(name.name).to_query())
 
     def list(self, name: Name):
-        print(f'list: name: {name}')
+        q = self._query(name.name)
+        print('\n'.join([a.location for a in q.alternatives]))
 
     def config(self, name: Name):
-        print(f'config: name: {name}')
+        q = self._query(name.name)
+        n = len(q.alternatives)
+        a = name.name
+        p = q.link
+        print(f'There are {n} choices for the alternative {a} (providing {p}).')
+        print()
+
+        # sanity check
+        if n == 0:
+            raise Exception('cannot configure as there are no choices')
+
+        # selected (y/n), choice #, path of choice, priority, auto/manual
+        headers = [' ', 'Selection   ', 'Path', 'Priority  ', 'Status']
+
+        # to be able to tell who is selected, get the current selection
+        cur = str(_readlink_f(Path(self.options.altdir).joinpath(name.name)))
+
+        # go through alternatives and pick out values
+        alts = sorted(q.alternatives, key=lambda x: x.priority)
+
+        # first row is the automatic selection
+        selections = [[
+            '*' if q.status == 'auto' else ' ',
+            '0', alts[-1].location,
+            f' {alts[-1].priority}',
+            'auto mode'
+        ]]
+
+        # then go through manual options
+        for i, alt in enumerate(alts):
+            selections.append([
+                '*' if cur == alt.location else ' ',
+                str(i + 1),
+                alt.location,
+                f' {alt.priority}',
+                'manual mode'
+            ])
+
+        # adjust widths
+        max_widths = [max([len(td) for td in col])
+                      for col in zip(*([headers] + selections))]
+        dash_lines = ['-' * (sum(max_widths) + 5)]
+        header_lines = [' '.join(c.ljust(w) for c, w in zip(row, max_widths))
+                        for row in [headers]]
+        selection_lines = [' '.join(c.ljust(w) for c, w in zip(row, max_widths))
+                           for row in selections]
+
+        # print the lines
+        print('\n'.join(header_lines + dash_lines + selection_lines))
+
+        # prompt the user
+        choice = input('Press <enter> to keep the current choice[*], or type selection number: ')
+
+        # user kept the default
+        if not choice:
+            return
+
+        # handle non-integer input
+        try:
+            # choice number
+            ch_num = int(choice)
+        except ValueError as v:
+            raise Exception(
+                'You must either enter a number'
+                ' or leave the selection blank to keep the current choice'
+            ) from v
+
+        # handle out of range input
+        if ch_num < 0 or ch_num > len(alts):
+            raise Exception(f'valid choices are between 0 and {len(alts)}')
+
+        # todo if user chose auto, update the db with this
+
+        choice_entity = alts[ch_num - 1] if ch_num > 0 else alts[-1]
+        if choice_entity.location == cur:
+            # everything is as it should be
+            return
+
+        # time to fix it
+        raise Exception('not implemented yet')
+        # self.link_alternative(choice_entity, name.name)
 
     @dataclass
     class Query:
@@ -354,6 +454,20 @@ class AlternativeUpdater:
                 alternatives=alternatives,
             )
 
+        def to_display(self, options: Options) -> str:
+            lines = [
+                f'{self.name} - {self.status} mode',
+                f'  link best version is {self.get_best().location}',
+                f'  link currently points to {_readlink_f(Path(options.altdir).joinpath(self.name))}',
+                f'  link {self.name} is {self.link}',
+                *[f'  secondary {s.name} is {s.link}' for s in self.secondaries],
+            ]
+            for alt in self.alternatives:
+                lines.append(f'{alt.location} - priority {alt.priority}')
+                for s, _s in zip(self.secondaries, alt.secondaries):
+                    lines.append(f'  secondary {s.name}: {_s.link}')
+            return '\n'.join(lines)
+
 
 def run(args: Optional[List[str]] = None):
     parser = ArgumentParser()
@@ -406,4 +520,7 @@ def run(args: Optional[List[str]] = None):
 
 
 if __name__ == '__main__':
+    import sys
+
+    sys.argv = ['', 'config', 'python']
     run()
