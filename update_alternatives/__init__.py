@@ -138,7 +138,7 @@ def read_options(locations: Optional[List[Union[str, Path]]] = None,
         if location.exists() and location.is_file():
             o = o.combine_with(Options.from_toml(location.read_text('utf-8')))
     if final_options:
-        o.combine_with(final_options)
+        o = o.combine_with(final_options)
     return o
 
 
