@@ -215,7 +215,11 @@ class AlternativeUpdater:
         print(f'all')
 
     def auto(self, name: Name):
-        print(f'auto: name: {name}')
+        """untested"""
+        q = self._query(name.name)
+        q.status = 'auto'
+        highest = q.get_best()
+        self.set(NameAndPath(name=name.name, path=highest.location))
 
     def display(self, name: Name):
         print(f'display: name: {name}')
@@ -264,6 +268,11 @@ class AlternativeUpdater:
             priority: int
             secondaries: List['AlternativeUpdater.Query.Secondary'] = field(default_factory=list)
 
+            @staticmethod
+            def best(*alts: 'AlternativeUpdater.Query.Alternative') \
+                    -> Optional['AlternativeUpdater.Query.Alternative']:
+                return next(iter(sorted(alts, key=lambda x: x.priority, reverse=True)), None)
+
         def stringify(self) -> str:
             lines = [self.status, self.link]
             for s in self.secondaries:
@@ -295,13 +304,8 @@ class AlternativeUpdater:
 
             return '\n'.join(lines)
 
-        """
         def get_best(self) -> Optional[Alternative]:
-            if not self.alternatives: return None  # noqa
-            a = self.alternatives[:]
-            a.sort(key=lambda x: x.priority)
-            return a[-1]
-        """
+            return AlternativeUpdater.Query.Alternative.best(*self.alternatives)
 
         @staticmethod
         def parse(path: Path) -> 'AlternativeUpdater.Query':
@@ -344,7 +348,7 @@ class AlternativeUpdater:
                 name=path.name,
                 link=link,
                 status=status,
-                best=(alternatives[-1]).location,
+                best=AlternativeUpdater.Query.Alternative.best(*alternatives).location,
                 value=str(_readlink_f(Path(link))),
                 secondaries=secondaries,
                 alternatives=alternatives,
