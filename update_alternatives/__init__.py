@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser
 from dataclasses import dataclass, fields, field, asdict
 from enum import Enum
@@ -61,6 +62,12 @@ class Installation:
     name: str
     path: str
     priority: int
+
+    def as_alternative(self) -> 'AlternativeUpdater.Query.Alternative':
+        return AlternativeUpdater.Query.Alternative(
+            location=self.path,
+            priority=self.priority
+        )
 
 
 @dataclass
@@ -135,13 +142,65 @@ def read_options(locations: Optional[List[Union[str, Path]]] = None,
     return o
 
 
+def _readlink_f(path: Path) -> Path:
+    while path.is_symlink():
+        path = path.readlink()
+    return path
+
+
 # noinspection PyMethodMayBeStatic
 @dataclass
 class AlternativeUpdater:
     options: Options = field(default_factory=Options)
 
     def install(self, installation: Installation):
-        print(f'installation: {installation}')
+        """untested"""
+        admin_path = Path(self.options.admindir).joinpath(installation.name)
+        alt_path = Path(self.options.altdir).joinpath(installation.name)
+
+        if not admin_path.exists():
+            query = AlternativeUpdater.Query(
+                name=installation.name,
+                link=installation.link,
+                status='auto',
+                best=installation.path,
+                value=installation.path,
+                alternatives=[installation.as_alternative()]
+            )
+            # if new alternative is the only one, link it
+            # but: if you install and there are others, don't
+            # todo confirm what update-alternatives does and match
+            # inner link:
+            os.link(src=alt_path, dst=query.best)
+            # outer link:
+            os.link(src=installation.link, dst=alt_path)
+        else:
+            query = AlternativeUpdater.Query.parse(admin_path)
+
+            # allow the user to manipulate the outer link here
+            if query.link != installation.link:
+                # inform user of change
+                print(f'update_alternatives: renaming {query.name} link '
+                      f'from {query.link} to {installation.link}')
+                # remove old
+                os.remove(query.link)
+                # create new
+                os.link(src=installation.link, dst=alt_path)
+                # update database
+                query.link = installation.link
+
+            # search existing alternatives for matching inner link
+            # if found - update, else append
+            found = False
+            for alt in query.alternatives:
+                if alt.location == installation.path:
+                    alt.priority = installation.priority
+                    found = True
+                    break
+            if not found:
+                query.alternatives.append(installation.as_alternative())
+
+        admin_path.write_text(query.stringify())
 
     def set(self, name_and_path: NameAndPath):
         print(f'set: name_and_path: {name_and_path}')
@@ -167,15 +226,15 @@ class AlternativeUpdater:
     def set_selections(self):
         print(f'set_selections')
 
-    def query(self, name: Name):
-        print(f'query: name: {name}')
-        # AlternativeUpdater.Query.parse()
-        path = Path(self.options.admindir).joinpath(name.name)
+    def _query(self, name: str):
+        path = Path(self.options.admindir).joinpath(name)
         if not path.exists():
-            raise Exception(f'no such alternative: {name.name}')
-        # import pprint
-        # pprint.pprint(AlternativeUpdater.Query.parse(path))
-        print(AlternativeUpdater.Query.parse(path).to_query())
+            raise Exception(f'no such alternative: {name}')
+        query = AlternativeUpdater.Query.parse(path)
+        return query
+
+    def query(self, name: Name):
+        print(self._query(name.name).to_query())
 
     def list(self, name: Name):
         print(f'list: name: {name}')
@@ -226,7 +285,7 @@ class AlternativeUpdater:
                 f'Link: {self.link}',
                 f'Status: {self.status}',
                 f'Best: {self.best}',
-                f'Value: {Path(self.link).readlink()}',
+                f'Value: {_readlink_f(Path(self.link))}',
             ]
 
             for a in (self.alternatives or []):
@@ -286,7 +345,7 @@ class AlternativeUpdater:
                 link=link,
                 status=status,
                 best=(alternatives[-1]).location,
-                value=str(Path(link).readlink()),
+                value=str(_readlink_f(Path(link))),
                 secondaries=secondaries,
                 alternatives=alternatives,
             )

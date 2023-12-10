@@ -2,6 +2,7 @@ import textwrap
 from pathlib import Path
 
 import pytest
+import pytest_mock
 
 from update_alternatives import AlternativeUpdater
 
@@ -144,7 +145,13 @@ def alternative_updater():
         ],
     ]
 )
-def test(sample: str, expected: AlternativeUpdater.Query, alternative_updater):
+def test_parse_stringify(
+        sample: str,
+        expected: AlternativeUpdater.Query,
+        alternative_updater: AlternativeUpdater,
+        mocker: pytest_mock.MockerFixture,
+):
+    mocker.patch('update_alternatives._readlink_f', return_value=f'/etc/alternatives/{sample}')
     sample_path = Path(__file__).parent.joinpath('sample-alternatives-files', sample)
 
     query = alternative_updater.Query.parse(sample_path)
@@ -177,7 +184,9 @@ def test(sample: str, expected: AlternativeUpdater.Query, alternative_updater):
 )
 def test_to_query(sample: str,
                   expected: str,
+                  mocker: pytest_mock.MockerFixture,
                   alternative_updater: AlternativeUpdater):
+    mocker.patch('update_alternatives._readlink_f', return_value='/etc/alternatives/python')
     expected = textwrap.dedent(expected).strip()
     sample_path = Path(__file__).parent.joinpath('sample-alternatives-files', sample)
 

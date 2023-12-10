@@ -14,7 +14,36 @@ Basically, it is the same usage as `update-alternatives`,
 except that the commands are not named with the `--` prefix,
 as argparse does not support that.
 
+Secondary (slave) links creation is not supported.
+Aiming for backwards compatibility where those exist,
+just not creation of new secondary links.
+
+### rc files
+
 Additionally, this supports a "run command" style file.
+It will read these toml files before interpreting cli args
+(which are overridable in programmatic usage):
+
+```python
+from pathlib import Path
+
+# in order of lowest to highest priority
+OPTIONS_LOCATIONS = [
+    Path('etc', '.py-update-alternatives.toml'),
+    Path.home().joinpath('.py-update-alternatives.toml'),
+]
+
+# override in programmatic usage
+import update_alternatives
+update_alternatives.OPTIONS_LOCATIONS = OPTIONS_LOCATIONS
+```
+
+the order of priority
+ 
+1. cli arguments override all others
+2. home folder if an option is not specified
+3. `/etc` folder if an option is still not found
+4. some built-in defaults (see test cases for rc files)  
 
 
 ## development
