@@ -169,6 +169,13 @@ class AlternativeUpdater:
 
     def query(self, name: Name):
         print(f'query: name: {name}')
+        # AlternativeUpdater.Query.parse()
+        path = Path(self.options.admindir).joinpath(name.name)
+        if not path.exists():
+            raise Exception(f'no such alternative: {name.name}')
+        # import pprint
+        # pprint.pprint(AlternativeUpdater.Query.parse(path))
+        print(AlternativeUpdater.Query.parse(path).to_query())
 
     def list(self, name: Name):
         print(f'list: name: {name}')
@@ -181,10 +188,11 @@ class AlternativeUpdater:
         name: str
         link: str
         status: str
+        # todo make this a property
         best: str
         value: str
-        secondaries: List['AlternativeUpdater.Query.Secondary']
-        alternatives: List['AlternativeUpdater.Query.Alternative']
+        secondaries: List['AlternativeUpdater.Query.Secondary'] = field(default_factory=list)
+        alternatives: List['AlternativeUpdater.Query.Alternative'] = field(default_factory=list)
 
         @dataclass
         class Secondary:
@@ -195,7 +203,7 @@ class AlternativeUpdater:
         class Alternative:
             location: str
             priority: int
-            secondaries: List['AlternativeUpdater.Query.Secondary']
+            secondaries: List['AlternativeUpdater.Query.Secondary'] = field(default_factory=list)
 
         def stringify(self) -> str:
             lines = [self.status, self.link]
@@ -211,6 +219,30 @@ class AlternativeUpdater:
             lines.append('')
             lines.append('')
             return '\n'.join(lines)
+
+        def to_query(self) -> str:
+            lines = [
+                f'Name: {self.name}',
+                f'Link: {self.link}',
+                f'Status: {self.status}',
+                f'Best: {self.best}',
+                f'Value: {Path(self.link).readlink()}',
+            ]
+
+            for a in (self.alternatives or []):
+                lines.append('')
+                lines.append(f'Alternative: {a.location}')
+                lines.append(f'Priority: {a.priority}')
+
+            return '\n'.join(lines)
+
+        """
+        def get_best(self) -> Optional[Alternative]:
+            if not self.alternatives: return None  # noqa
+            a = self.alternatives[:]
+            a.sort(key=lambda x: x.priority)
+            return a[-1]
+        """
 
         @staticmethod
         def parse(path: Path) -> 'AlternativeUpdater.Query':
@@ -239,7 +271,7 @@ class AlternativeUpdater:
                     secondaries=alt_sec
                 ))
                 i += 2
-                while lines[i]:
+                for j in range(len(secondaries)):
                     alt_sec.append(
                         AlternativeUpdater.Query.Secondary(
                             name=Path(lines[i]).name,
@@ -247,7 +279,7 @@ class AlternativeUpdater:
                         )
                     )
                     i += 1
-                i += 1
+                # i += 1
 
             return AlternativeUpdater.Query(
                 name=path.name,
